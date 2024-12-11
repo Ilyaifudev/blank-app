@@ -3,24 +3,30 @@ from bs4 import BeautifulSoup
 import requests
 
 
-def scrape_dexscreener():
+def scrape_dexscreener_with_proxy():
     """
-    Scrapes Dexscreener's trending tokens using requests and BeautifulSoup.
+    Scrapes Dexscreener's trending tokens using a proxy.
     """
     url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
     }
 
+    # Use a proxy service
+    proxies = {
+        "http": "http://your-proxy-url:port",  # Replace with your HTTP proxy
+        "https": "http://your-proxy-url:port",  # Replace with your HTTPS proxy
+    }
+
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, proxies=proxies)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
         tokens = []
 
         # Locate the table rows containing token data
-        rows = soup.select("tr")  # Update selector based on the actual table structure
+        rows = soup.select("tr")  # Update selector if required
         for row in rows:
             columns = row.find_all("td")
             if len(columns) > 1:
@@ -43,22 +49,28 @@ def scrape_dexscreener():
                 })
 
         return tokens
-    except Exception as e:
-        st.error(f"Error scraping Dexscreener: {e}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error scraping Dexscreener with Proxy: {e}")
         return []
 
 
-def scrape_gmgn():
+def scrape_gmgn_with_proxy():
     """
-    Scrapes GMGN's trending tokens using requests and BeautifulSoup.
+    Scrapes GMGN's trending tokens using a proxy.
     """
     url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
     }
 
+    # Use a proxy service
+    proxies = {
+        "http": "http://your-proxy-url:port",  # Replace with your HTTP proxy
+        "https": "http://your-proxy-url:port",  # Replace with your HTTPS proxy
+    }
+
     try:
-        response = requests.get(url, headers=headers)
+        response = requests.get(url, headers=headers, proxies=proxies)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -67,12 +79,12 @@ def scrape_gmgn():
         # Update selectors to match GMGN's HTML structure
         rows = soup.select(".token-item")  # Update based on actual HTML
         for row in rows:
-            name = row.select_one(".token-name").text.strip()
-            contract = row.select_one(".token-contract").text.strip()
-            liquidity = row.select_one(".token-liquidity").text.strip().replace("$", "").replace(",", "")
-            volume = row.select_one(".token-volume").text.strip().replace("$", "").replace(",", "")
-            age = row.select_one(".token-age").text.strip().replace(" hours", "")
-            holders = row.select_one(".token-holders").text.strip().replace(",", "")
+            name = row.select_one(".token-name").text.strip() if row.select_one(".token-name") else "N/A"
+            contract = row.select_one(".token-contract").text.strip() if row.select_one(".token-contract") else "N/A"
+            liquidity = row.select_one(".token-liquidity").text.strip().replace("$", "").replace(",", "") if row.select_one(".token-liquidity") else "0"
+            volume = row.select_one(".token-volume").text.strip().replace("$", "").replace(",", "") if row.select_one(".token-volume") else "0"
+            age = row.select_one(".token-age").text.strip().replace(" hours", "") if row.select_one(".token-age") else "0"
+            holders = row.select_one(".token-holders").text.strip().replace(",", "") if row.select_one(".token-holders") else "0"
 
             tokens.append({
                 "name": name,
@@ -84,8 +96,8 @@ def scrape_gmgn():
             })
 
         return tokens
-    except Exception as e:
-        st.error(f"Error scraping GMGN: {e}")
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error scraping GMGN with Proxy: {e}")
         return []
 
 
@@ -95,7 +107,7 @@ st.title("Trending Token Scraper")
 # Scrape Dexscreener Data
 st.header("Dexscreener Trending Tokens")
 if st.button("Scrape Dexscreener"):
-    dexscreener_tokens = scrape_dexscreener()
+    dexscreener_tokens = scrape_dexscreener_with_proxy()
     if dexscreener_tokens:
         st.write(f"Found {len(dexscreener_tokens)} tokens on Dexscreener.")
         for token in dexscreener_tokens:
@@ -106,7 +118,7 @@ if st.button("Scrape Dexscreener"):
 # Scrape GMGN Data
 st.header("GMGN Trending Tokens")
 if st.button("Scrape GMGN"):
-    gmgn_tokens = scrape_gmgn()
+    gmgn_tokens = scrape_gmgn_with_proxy()
     if gmgn_tokens:
         st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
         for token in gmgn_tokens:
