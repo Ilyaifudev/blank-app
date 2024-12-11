@@ -1,77 +1,39 @@
-import streamlit as st
-from bs4 import BeautifulSoup
-import requests
-
-
-def scrape_dexscreener_with_proxy():
-    """
-    Scrapes Dexscreener's trending tokens using a proxy and ignores SSL verification.
-    """
-    url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
-    }
-
-    # Proxy details
-    proxies = {
-        "http": "http://160.223.163.31:8080",
-        "https": "http://160.223.163.31:8080",
-    }
-
-    try:
-        response = requests.get(url, headers=headers, proxies=proxies, verify=False)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.text, "html.parser")
-        tokens = []
-
-        # Locate the table rows containing token data
-        rows = soup.select("tr")  # Update selector if required
-        for row in rows:
-            columns = row.find_all("td")
-            if len(columns) > 1:
-                name = columns[0].text.strip()
-                price = columns[1].text.strip()
-                age = columns[2].text.strip()
-                txns = columns[3].text.strip()
-                volume = columns[4].text.strip()
-                liquidity = columns[5].text.strip()
-                mcap = columns[6].text.strip()
-
-                tokens.append({
-                    "name": name,
-                    "price": price,
-                    "age": age,
-                    "txns": txns,
-                    "volume": volume,
-                    "liquidity": liquidity,
-                    "mcap": mcap,
-                })
-
-        return tokens
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error scraping Dexscreener with Proxy: {e}")
-        return []
-
-
 def scrape_gmgn_with_proxy():
     """
-    Scrapes GMGN's trending tokens using a proxy and ignores SSL verification.
+    Scrapes GMGN's trending tokens using a proxy with enhanced headers and retry mechanism.
     """
+    import random
+    from tenacity import retry, stop_after_attempt, wait_fixed
+
     url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.5",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "DNT": "1",
     }
 
-    # Proxy details
+    # Rotate proxies
+    proxies_list = [
+        "http://160.223.163.31:8080",
+        "http://165.227.44.38:3128",
+    ]
     proxies = {
-        "http": "http://160.223.163.31:8080",
-        "https": "http://160.223.163.31:8080",
+        "http": random.choice(proxies_list),
+        "https": random.choice(proxies_list),
     }
 
-    try:
+    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
+    def fetch_data():
         response = requests.get(url, headers=headers, proxies=proxies, verify=False)
         response.raise_for_status()
+        return response
+
+    try:
+        response = fetch_data()
 
         soup = BeautifulSoup(response.text, "html.parser")
         tokens = []
@@ -99,29 +61,3 @@ def scrape_gmgn_with_proxy():
     except requests.exceptions.RequestException as e:
         st.error(f"Error scraping GMGN with Proxy: {e}")
         return []
-
-
-# Streamlit App
-st.title("Trending Token Scraper")
-
-# Scrape Dexscreener Data
-st.header("Dexscreener Trending Tokens")
-if st.button("Scrape Dexscreener"):
-    dexscreener_tokens = scrape_dexscreener_with_proxy()
-    if dexscreener_tokens:
-        st.write(f"Found {len(dexscreener_tokens)} tokens on Dexscreener.")
-        for token in dexscreener_tokens:
-            st.write(token)
-    else:
-        st.warning("No tokens found or failed to scrape Dexscreener.")
-
-# Scrape GMGN Data
-st.header("GMGN Trending Tokens")
-if st.button("Scrape GMGN"):
-    gmgn_tokens = scrape_gmgn_with_proxy()
-    if gmgn_tokens:
-        st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
-        for token in gmgn_tokens:
-            st.write(token)
-    else:
-        st.warning("No tokens found or failed to scrape GMGN.")
