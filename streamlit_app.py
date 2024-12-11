@@ -1,8 +1,8 @@
 import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import requests
 
@@ -10,7 +10,7 @@ import requests
 # Function to scrape Dexscreener using Selenium
 def scrape_dexscreener_trending():
     """
-    Scrapes Dexscreener's trending tokens using Selenium.
+    Scrapes Dexscreener's trending tokens using Selenium with WebDriver Manager.
     """
     url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
 
@@ -21,9 +21,8 @@ def scrape_dexscreener_trending():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
 
-    # Replace 'path_to_chromedriver' with your Chromedriver path
-    service = Service("path_to_chromedriver")  # Update this with your Chromedriver path
-    driver = webdriver.Chrome(service=service, options=options)
+    # Use WebDriver Manager to install and manage Chromedriver automatically
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
 
     tokens = []
 
@@ -100,27 +99,6 @@ def scrape_gmgn_trending():
         return []
 
 
-# Function to filter tokens based on criteria
-def filter_tokens(tokens):
-    """
-    Filters tokens based on specified criteria:
-    - Liquidity < 100,000
-    - Volume < 250,000
-    - Age ≥ 24 hours
-    - Holders ≤ 300
-    """
-    filtered = []
-    for token in tokens:
-        if (
-            token["liquidity"] < 100000 and
-            token["volume"] < 250000 and
-            token["age"] >= 24 and
-            token["holders"] <= 300
-        ):
-            filtered.append(token)
-    return filtered
-
-
 # Streamlit App
 st.title("Trending Token Scraper")
 
@@ -141,9 +119,7 @@ if st.button("Scrape GMGN"):
     gmgn_tokens = scrape_gmgn_trending()
     if gmgn_tokens:
         st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
-        filtered_gmgn = filter_tokens(gmgn_tokens)
-        st.write(f"{len(filtered_gmgn)} tokens meet the criteria:")
-        for token in filtered_gmgn:
-            st.write(f"Name: {token['name']}, Contract: {token['contract']}")
+        for token in gmgn_tokens:
+            st.write(token)
     else:
         st.warning("No tokens found or failed to scrape GMGN.")
