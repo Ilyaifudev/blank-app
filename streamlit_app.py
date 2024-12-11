@@ -1,41 +1,36 @@
 import streamlit as st
-from playwright.sync_api import sync_playwright
+from bs4 import BeautifulSoup
+import requests
 
-def scrape_dexscreener_with_playwright():
+
+def scrape_dexscreener():
     """
-    Scrapes Dexscreener's trending tokens using Playwright.
+    Scrapes Dexscreener's trending tokens using requests and BeautifulSoup.
     """
     url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
+    }
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
 
-        # Intercept and block specific requests
-        def block_request(route, request):
-            if "cdn.segment.com" in request.url:
-                route.abort()
-            else:
-                route.continue_()
-
-        page.route("**/*", block_request)
-        page.goto(url)
-
-        # Scrape data
-        rows = page.query_selector_all("tr")
+        soup = BeautifulSoup(response.text, "html.parser")
         tokens = []
 
+        # Locate the table rows containing token data
+        rows = soup.select("tr")  # Update selector based on the actual table structure
         for row in rows:
-            columns = row.query_selector_all("td")
+            columns = row.find_all("td")
             if len(columns) > 1:
-                name = columns[0].inner_text()
-                price = columns[1].inner_text()
-                age = columns[2].inner_text()
-                txns = columns[3].inner_text()
-                volume = columns[4].inner_text()
-                liquidity = columns[5].inner_text()
-                mcap = columns[6].inner_text()
+                name = columns[0].text.strip()
+                price = columns[1].text.strip()
+                age = columns[2].text.strip()
+                txns = columns[3].text.strip()
+                volume = columns[4].text.strip()
+                liquidity = columns[5].text.strip()
+                mcap = columns[6].text.strip()
 
                 tokens.append({
                     "name": name,
@@ -44,45 +39,40 @@ def scrape_dexscreener_with_playwright():
                     "txns": txns,
                     "volume": volume,
                     "liquidity": liquidity,
-                    "mcap": mcap
+                    "mcap": mcap,
                 })
 
-        browser.close()
         return tokens
+    except Exception as e:
+        st.error(f"Error scraping Dexscreener: {e}")
+        return []
 
 
-def scrape_gmgn_with_playwright():
+def scrape_gmgn():
     """
-    Scrapes GMGN's website for trending tokens using Playwright.
+    Scrapes GMGN's trending tokens using requests and BeautifulSoup.
     """
     url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
+    }
 
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context()
-        page = context.new_page()
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
 
-        # Intercept and block specific requests
-        def block_request(route, request):
-            if "cdn.segment.com" in request.url:
-                route.abort()
-            else:
-                route.continue_()
-
-        page.route("**/*", block_request)
-        page.goto(url)
-
-        # Scrape data
+        soup = BeautifulSoup(response.text, "html.parser")
         tokens = []
-        rows = page.query_selector_all(".token-item")  # Update this selector based on GMGN's HTML structure
 
+        # Update selectors to match GMGN's HTML structure
+        rows = soup.select(".token-item")  # Update based on actual HTML
         for row in rows:
-            name = row.query_selector(".token-name").inner_text()  # Update selector
-            contract = row.query_selector(".token-contract").inner_text()  # Update selector
-            liquidity = row.query_selector(".token-liquidity").inner_text().replace("$", "").replace(",", "")
-            volume = row.query_selector(".token-volume").inner_text().replace("$", "").replace(",", "")
-            age = row.query_selector(".token-age").inner_text().replace(" hours", "")
-            holders = row.query_selector(".token-holders").inner_text().replace(",", "")
+            name = row.select_one(".token-name").text.strip()
+            contract = row.select_one(".token-contract").text.strip()
+            liquidity = row.select_one(".token-liquidity").text.strip().replace("$", "").replace(",", "")
+            volume = row.select_one(".token-volume").text.strip().replace("$", "").replace(",", "")
+            age = row.select_one(".token-age").text.strip().replace(" hours", "")
+            holders = row.select_one(".token-holders").text.strip().replace(",", "")
 
             tokens.append({
                 "name": name,
@@ -93,8 +83,10 @@ def scrape_gmgn_with_playwright():
                 "holders": int(holders),
             })
 
-        browser.close()
         return tokens
+    except Exception as e:
+        st.error(f"Error scraping GMGN: {e}")
+        return []
 
 
 # Streamlit App
@@ -103,7 +95,7 @@ st.title("Trending Token Scraper")
 # Scrape Dexscreener Data
 st.header("Dexscreener Trending Tokens")
 if st.button("Scrape Dexscreener"):
-    dexscreener_tokens = scrape_dexscreener_with_playwright()
+    dexscreener_tokens = scrape_dexscreener()
     if dexscreener_tokens:
         st.write(f"Found {len(dexscreener_tokens)} tokens on Dexscreener.")
         for token in dexscreener_tokens:
@@ -114,7 +106,7 @@ if st.button("Scrape Dexscreener"):
 # Scrape GMGN Data
 st.header("GMGN Trending Tokens")
 if st.button("Scrape GMGN"):
-    gmgn_tokens = scrape_gmgn_with_playwright()
+    gmgn_tokens = scrape_gmgn()
     if gmgn_tokens:
         st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
         for token in gmgn_tokens:
