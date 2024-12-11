@@ -1,128 +1,111 @@
 import streamlit as st
 import requests
+from bs4 import BeautifulSoup
 
-# Fetch data from Dexscreener
-def fetch_token_data(token_address):
-    """Fetches data from Dexscreener for a given token."""
+# Function to scrape Dexscreener for trending tokens
+def scrape_dexscreener_trending():
+    url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        url = f"https://api.dexscreener.io/latest/dex/tokens/{token_address}"
-        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        st.error(f"Error fetching Dexscreener data: {e}")
-        return None
+        soup = BeautifulSoup(response.text, 'html.parser')
 
-# Fetch data from GMGN
-def fetch_gmgn_data():
-    """Scrapes GMGN data for trending tokens."""
-    try:
-        url = "https://gmgn.com/api/trending"  # Replace with the actual GMGN API endpoint
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-        return response.json()
+        tokens = []
+        for row in soup.select('tr'):
+            columns = row.find_all('td')
+            if len(columns) > 1:
+                name = columns[0].get_text(strip=True)
+                price = columns[1].get_text(strip=True)
+                age = columns[2].get_text(strip=True)
+                txns = columns[3].get_text(strip=True)
+                volume = columns[4].get_text(strip=True)
+                liquidity = columns[5].get_text(strip=True)
+                mcap = columns[6].get_text(strip=True)
+
+                tokens.append({
+                    "name": name,
+                    "price": price,
+                    "age": age,
+                    "txns": txns,
+                    "volume": volume,
+                    "liquidity": liquidity,
+                    "mcap": mcap
+                })
+        return tokens
     except Exception as e:
-        st.error(f"Error fetching GMGN data: {e}")
+        st.error(f"Error scraping Dexscreener: {e}")
         return []
 
-# Filter tokens based on criteria
-def filter_tokens(token_data):
-    """Filters tokens based on specified criteria."""
-    filtered_tokens = []
-    if token_data:
-        for pair in token_data.get("pairs", []):
-            liquidity = pair.get("liquidity", {}).get("usd", 0)
-            volume = pair.get("volume", {}).get("usd", 0)
-            age_hours = pair.get("pairCreatedAt", 0) / 3600  # Convert seconds to hours
-            holders = pair.get("holders", 0)  # Ensure the API provides this field
-
-            if (
-                liquidity < 100000
-                and volume < 250000
-                and age_hours >= 24
-                and holders <= 300
-            ):
-                filtered_tokens.append(pair)
-    return filtered_tokens
-
-# RugCheck safety evaluation
-def check_rug_safety(contract_address):
-    """Runs the contract address through RugCheck and retrieves the safety report."""
+# Function to scrape GMGN for trending tokens
+def scrape_gmgn_trending():
+    url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
+    headers = {"User-Agent": "Mozilla/5.0"}
     try:
-        url = f"https://rugcheck.xyz/api/check/{contract_address}"
-        headers = {"User-Agent": "Mozilla/5.0"}
         response = requests.get(url, headers=headers)
         response.raise_for_status()
-        data = response.json()
-        if data.get("minimum_score") in ["Good", "Excellent"]:
-            return data
+        soup = BeautifulSoup(response.text, 'html.parser')
+
+        tokens = []
+        for item in soup.select('.token-item'):
+            name = item.select_one('.token-name').get_text(strip=True)
+            contract = item.select_one('.token-contract').get_text(strip=True)
+            liquidity = item.select_one('.token-liquidity').get_text(strip=True)
+            volume = item.select_one('.token-volume').get_text(strip=True)
+            age = item.select_one('.token-age').get_text(strip=True)
+            holders = item.select_one('.token-holders').get_text(strip=True)
+
+            tokens.append({
+                "name": name,
+                "contract": contract,
+                "liquidity": float(liquidity.replace("$", "").replace(",", "")),
+                "volume": float(volume.replace("$", "").replace(",", "")),
+                "age": float(age.replace(" hours", "")),
+                "holders": int(holders.replace(",", ""))
+            })
+        return tokens
     except Exception as e:
-        st.error(f"Error checking RugCheck for {contract_address}: {e}")
-    return None
+        st.error(f"Error scraping GMGN: {e}")
+        return []
+
+# Function to filter tokens based on specified criteria
+def filter_tokens(tokens):
+    filtered = []
+    for token in tokens:
+        if (
+            token["liquidity"] < 100000 and
+            token["volume"] < 250000 and
+            token["age"] >= 24 and
+            token["holders"] <= 300
+        ):
+            filtered.append(token)
+    return filtered
 
 # Streamlit App
-st.title("Token Screener & Rug Safety Checker")
+st.title("Trending Token Scraper")
 
-# Input for token contract address
-token_address = st.text_input("Enter Token Contract Address:")
-
-if st.button("Check Token"):
-    if token_address:
-        st.write("Fetching token data...")
-        token_data = fetch_token_data(token_address)
-
-        if token_data:
-            st.write("Filtering tokens based on criteria...")
-            filtered_tokens = filter_tokens(token_data)
-
-            if filtered_tokens:
-                st.write(f"Found {len(filtered_tokens)} tokens meeting criteria.")
-                for token in filtered_tokens:
-                    st.write(
-                        f"Checking safety for token: {token.get('name', 'Unknown')} ({token_address})"
-                    )
-                    safety_report = check_rug_safety(token_address)
-                    if safety_report:
-                        st.success(
-                            f"Token: {token.get('name', 'Unknown')} ({token_address}) - Safety Score: {safety_report['minimum_score']}"
-                        )
-                    else:
-                        st.warning(
-                            f"Token {token.get('name', 'Unknown')} did not pass RugCheck criteria."
-                        )
-            else:
-                st.warning("No tokens meet the specified criteria.")
-        else:
-            st.error("Failed to fetch token data.")
+# Scrape Dexscreener Data
+st.header("Dexscreener Trending Tokens")
+if st.button("Scrape Dexscreener"):
+    dexscreener_tokens = scrape_dexscreener_trending()
+    if dexscreener_tokens:
+        st.write(f"Found {len(dexscreener_tokens)} tokens on Dexscreener.")
+        filtered_dexscreener = filter_tokens(dexscreener_tokens)
+        st.write(f"{len(filtered_dexscreener)} tokens meet the criteria:")
+        for token in filtered_dexscreener:
+            st.write(f"Name: {token['name']}, Contract: {token['contract']}")
     else:
-        st.error("Please enter a valid token contract address.")
+        st.warning("No tokens found or failed to scrape Dexscreener.")
 
-# GMGN Integration
-st.subheader("Fetch Trending Tokens from GMGN")
-if st.button("Fetch GMGN Trending Tokens"):
-    gmgn_data = fetch_gmgn_data()
-    if gmgn_data:
-        st.write(f"Found {len(gmgn_data)} trending tokens on GMGN.")
-        for token in gmgn_data:
-            st.write(f"Token: {token.get('name', 'Unknown')} - Contract: {token.get('contract', 'N/A')}")
+# Scrape GMGN Data
+st.header("GMGN Trending Tokens")
+if st.button("Scrape GMGN"):
+    gmgn_tokens = scrape_gmgn_trending()
+    if gmgn_tokens:
+        st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
+        filtered_gmgn = filter_tokens(gmgn_tokens)
+        st.write(f"{len(filtered_gmgn)} tokens meet the criteria:")
+        for token in filtered_gmgn:
+            st.write(f"Name: {token['name']}, Contract: {token['contract']}")
     else:
-        st.warning("No trending tokens found on GMGN.")
-
-# Manual RugCheck
-st.subheader("Manual RugCheck")
-manual_contract = st.text_input("Enter a contract address for manual check:")
-if st.button("Run Manual RugCheck"):
-    if manual_contract.strip():
-        safety_report = check_rug_safety(manual_contract.strip())
-        if safety_report:
-            st.success(
-                f"Contract Address: {manual_contract} - Safety Score: {safety_report['minimum_score']}"
-            )
-        else:
-            st.warning(
-                f"Contract Address: {manual_contract} did not pass RugCheck criteria."
-            )
-    else:
-        st.error("Please enter a valid contract address.")
+        st.warning("No tokens found or failed to scrape GMGN.")
