@@ -2,9 +2,21 @@ import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By  # Import for locating elements
+from selenium.webdriver.chrome.webdriver import WebDriver
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from bs4 import BeautifulSoup
 import requests
+
+
+def enable_request_blocking(driver: WebDriver):
+    """
+    Enable blocking of network requests to specific URLs.
+    """
+    driver.execute_cdp_cmd(
+        "Network.setBlockedURLs", {"urls": ["https://cdn.segment.com/*"]}
+    )
+    driver.execute_cdp_cmd("Network.enable", {})
 
 
 def get_driver():
@@ -26,14 +38,18 @@ def get_driver():
     # Block unnecessary scripts and ads
     options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--disable-blink-features=Ads")
-    options.add_argument("--disable-blink-features=PreloadScripts")
-
-    # Block specific third-party domains (e.g., cdn.segment.com)
-    options.add_argument("host-resolver-rules=MAP cdn.segment.com 0.0.0.0")
 
     service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
 
-    driver = webdriver.Chrome(service=service, options=options)
+    # Enable logging for CDP commands
+    caps = DesiredCapabilities.CHROME
+    caps["goog:loggingPrefs"] = {"performance": "ALL"}
+
+    driver = webdriver.Chrome(service=service, options=options, desired_capabilities=caps)
+
+    # Block requests to specific third-party domains
+    enable_request_blocking(driver)
+
     return driver
 
 
@@ -49,7 +65,7 @@ def scrape_dexscreener_trending():
     try:
         driver.get(url)
 
-        # Locate rows in the trending table (Adjust selectors based on actual structure)
+        # Locate rows in the trending table
         rows = driver.find_elements(By.CSS_SELECTOR, "tr")
         for row in rows:
             columns = row.find_elements(By.CSS_SELECTOR, "td")
@@ -80,48 +96,9 @@ def scrape_dexscreener_trending():
         driver.quit()
 
 
-def scrape_gmgn_trending():
-    """
-    Scrapes GMGN's website for trending tokens.
-    """
-    url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
-    headers = {"User-Agent": "Mozilla/5.0"}
-
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
-
-        soup = BeautifulSoup(response.text, 'html.parser')
-        tokens = []
-
-        # Replace selectors with actual ones from GMGN's page structure
-        for item in soup.select(".token-item"):  # Update this selector
-            name = item.select_one(".token-name").get_text(strip=True)
-            contract = item.select_one(".token-contract").get_text(strip=True)
-            liquidity = item.select_one(".token-liquidity").get_text(strip=True)
-            volume = item.select_one(".token-volume").get_text(strip=True)
-            age = item.select_one(".token-age").get_text(strip=True)
-            holders = item.select_one(".token-holders").get_text(strip=True)
-
-            tokens.append({
-                "name": name,
-                "contract": contract,
-                "liquidity": float(liquidity.replace("$", "").replace(",", "")),
-                "volume": float(volume.replace("$", "").replace(",", "")),
-                "age": float(age.replace(" hours", "")),
-                "holders": int(holders.replace(",", ""))
-            })
-
-        return tokens
-    except Exception as e:
-        st.error(f"Error scraping GMGN: {e}")
-        return []
-
-
 # Streamlit App
 st.title("Trending Token Scraper")
 
-# Scrape Dexscreener Data
 st.header("Dexscreener Trending Tokens")
 if st.button("Scrape Dexscreener"):
     dexscreener_tokens = scrape_dexscreener_trending()
@@ -131,14 +108,3 @@ if st.button("Scrape Dexscreener"):
             st.write(token)
     else:
         st.warning("No tokens found or failed to scrape Dexscreener.")
-
-# Scrape GMGN Data
-st.header("GMGN Trending Tokens")
-if st.button("Scrape GMGN"):
-    gmgn_tokens = scrape_gmgn_trending()
-    if gmgn_tokens:
-        st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
-        for token in gmgn_tokens:
-            st.write(token)
-    else:
-        st.warning("No tokens found or failed to scrape GMGN.")
