@@ -1,87 +1,41 @@
 import streamlit as st
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.chrome.webdriver import WebDriver
-from selenium.webdriver.common.by import By
-from bs4 import BeautifulSoup
-import requests
+from playwright.sync_api import sync_playwright
 
-
-def enable_request_interception(driver: WebDriver):
+def scrape_dexscreener_with_playwright():
     """
-    Enable interception and blocking of network requests to specific URLs using Chrome DevTools Protocol (CDP).
-    """
-    # Enable request interception
-    driver.execute_cdp_cmd("Network.enable", {})
-    driver.execute_cdp_cmd("Network.setRequestInterception", {
-        "patterns": [
-            {"urlPattern": "https://cdn.segment.com/*", "resourceType": "Script", "interceptionStage": "HeadersReceived"}
-        ]
-    })
-
-    # Listen for intercepted requests and abort specific ones
-    def handle_intercepted_request():
-        while True:
-            try:
-                event = driver.execute_cdp_cmd("Network.continueInterceptedRequest", {})
-                if "cdn.segment.com" in event.get("request", {}).get("url", ""):
-                    driver.execute_cdp_cmd("Network.interceptedRequest", {"interceptionId": event["interceptionId"], "errorReason": "BlockedByClient"})
-            except Exception:
-                break
-
-    handle_intercepted_request()
-
-
-def get_driver():
-    """
-    Set up Selenium WebDriver with Chromium and Chromedriver.
-    """
-    options = Options()
-    options.add_argument("--headless")
-    options.add_argument("--disable-gpu")
-    options.add_argument("--no-sandbox")
-    options.add_argument("--disable-dev-shm-usage")
-    options.binary_location = "/usr/bin/chromium"  # Path to Chromium binary
-
-    # Set a legitimate User-Agent
-    options.add_argument(
-        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
-    )
-
-    service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
-    driver = webdriver.Chrome(service=service, options=options)
-
-    # Enable request interception
-    enable_request_interception(driver)
-
-    return driver
-
-
-def scrape_dexscreener_trending():
-    """
-    Scrapes Dexscreener's trending tokens using Selenium.
+    Scrapes Dexscreener's trending tokens using Playwright.
     """
     url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
 
-    driver = get_driver()
-    tokens = []
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
 
-    try:
-        driver.get(url)
+        # Intercept and block specific requests
+        def block_request(route, request):
+            if "cdn.segment.com" in request.url:
+                route.abort()
+            else:
+                route.continue_()
 
-        # Locate rows in the trending table
-        rows = driver.find_elements(By.CSS_SELECTOR, "tr")
+        page.route("**/*", block_request)
+        page.goto(url)
+
+        # Scrape data
+        rows = page.query_selector_all("tr")
+        tokens = []
+
         for row in rows:
-            columns = row.find_elements(By.CSS_SELECTOR, "td")
+            columns = row.query_selector_all("td")
             if len(columns) > 1:
-                name = columns[0].text
-                price = columns[1].text
-                age = columns[2].text
-                txns = columns[3].text
-                volume = columns[4].text
-                liquidity = columns[5].text
-                mcap = columns[6].text
+                name = columns[0].inner_text()
+                price = columns[1].inner_text()
+                age = columns[2].inner_text()
+                txns = columns[3].inner_text()
+                volume = columns[4].inner_text()
+                liquidity = columns[5].inner_text()
+                mcap = columns[6].inner_text()
 
                 tokens.append({
                     "name": name,
@@ -93,50 +47,54 @@ def scrape_dexscreener_trending():
                     "mcap": mcap
                 })
 
+        browser.close()
         return tokens
-    except Exception as e:
-        st.error(f"Error scraping Dexscreener with Selenium: {e}")
-        return []
-    finally:
-        driver.quit()
 
 
-def scrape_gmgn_trending():
+def scrape_gmgn_with_playwright():
     """
-    Scrapes GMGN's website for trending tokens.
+    Scrapes GMGN's website for trending tokens using Playwright.
     """
     url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
-    headers = {"User-Agent": "Mozilla/5.0"}
 
-    try:
-        response = requests.get(url, headers=headers)
-        response.raise_for_status()
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context()
+        page = context.new_page()
 
-        soup = BeautifulSoup(response.text, 'html.parser')
+        # Intercept and block specific requests
+        def block_request(route, request):
+            if "cdn.segment.com" in request.url:
+                route.abort()
+            else:
+                route.continue_()
+
+        page.route("**/*", block_request)
+        page.goto(url)
+
+        # Scrape data
         tokens = []
+        rows = page.query_selector_all(".token-item")  # Update this selector based on GMGN's HTML structure
 
-        # Replace selectors with actual ones from GMGN's page structure
-        for item in soup.select(".token-item"):  # Update this selector
-            name = item.select_one(".token-name").get_text(strip=True)
-            contract = item.select_one(".token-contract").get_text(strip=True)
-            liquidity = item.select_one(".token-liquidity").get_text(strip=True)
-            volume = item.select_one(".token-volume").get_text(strip=True)
-            age = item.select_one(".token-age").get_text(strip=True)
-            holders = item.select_one(".token-holders").get_text(strip=True)
+        for row in rows:
+            name = row.query_selector(".token-name").inner_text()  # Update selector
+            contract = row.query_selector(".token-contract").inner_text()  # Update selector
+            liquidity = row.query_selector(".token-liquidity").inner_text().replace("$", "").replace(",", "")
+            volume = row.query_selector(".token-volume").inner_text().replace("$", "").replace(",", "")
+            age = row.query_selector(".token-age").inner_text().replace(" hours", "")
+            holders = row.query_selector(".token-holders").inner_text().replace(",", "")
 
             tokens.append({
                 "name": name,
                 "contract": contract,
-                "liquidity": float(liquidity.replace("$", "").replace(",", "")),
-                "volume": float(volume.replace("$", "").replace(",", "")),
-                "age": float(age.replace(" hours", "")),
-                "holders": int(holders.replace(",", ""))
+                "liquidity": float(liquidity),
+                "volume": float(volume),
+                "age": float(age),
+                "holders": int(holders),
             })
 
+        browser.close()
         return tokens
-    except Exception as e:
-        st.error(f"Error scraping GMGN: {e}")
-        return []
 
 
 # Streamlit App
@@ -145,7 +103,7 @@ st.title("Trending Token Scraper")
 # Scrape Dexscreener Data
 st.header("Dexscreener Trending Tokens")
 if st.button("Scrape Dexscreener"):
-    dexscreener_tokens = scrape_dexscreener_trending()
+    dexscreener_tokens = scrape_dexscreener_with_playwright()
     if dexscreener_tokens:
         st.write(f"Found {len(dexscreener_tokens)} tokens on Dexscreener.")
         for token in dexscreener_tokens:
@@ -156,7 +114,7 @@ if st.button("Scrape Dexscreener"):
 # Scrape GMGN Data
 st.header("GMGN Trending Tokens")
 if st.button("Scrape GMGN"):
-    gmgn_tokens = scrape_gmgn_trending()
+    gmgn_tokens = scrape_gmgn_with_playwright()
     if gmgn_tokens:
         st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
         for token in gmgn_tokens:
