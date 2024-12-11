@@ -8,14 +8,29 @@ from bs4 import BeautifulSoup
 import requests
 
 
-def enable_request_blocking(driver: WebDriver):
+def enable_request_interception(driver: WebDriver):
     """
-    Enable blocking of network requests to specific URLs using Chrome DevTools Protocol (CDP).
+    Enable interception and blocking of network requests to specific URLs using Chrome DevTools Protocol (CDP).
     """
+    # Enable request interception
     driver.execute_cdp_cmd("Network.enable", {})
-    driver.execute_cdp_cmd("Network.setBlockedURLs", {
-        "urls": ["https://cdn.segment.com/*"]  # Block requests to this domain
+    driver.execute_cdp_cmd("Network.setRequestInterception", {
+        "patterns": [
+            {"urlPattern": "https://cdn.segment.com/*", "resourceType": "Script", "interceptionStage": "HeadersReceived"}
+        ]
     })
+
+    # Listen for intercepted requests and abort specific ones
+    def handle_intercepted_request():
+        while True:
+            try:
+                event = driver.execute_cdp_cmd("Network.continueInterceptedRequest", {})
+                if "cdn.segment.com" in event.get("request", {}).get("url", ""):
+                    driver.execute_cdp_cmd("Network.interceptedRequest", {"interceptionId": event["interceptionId"], "errorReason": "BlockedByClient"})
+            except Exception:
+                break
+
+    handle_intercepted_request()
 
 
 def get_driver():
@@ -37,8 +52,8 @@ def get_driver():
     service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
     driver = webdriver.Chrome(service=service, options=options)
 
-    # Enable request blocking
-    enable_request_blocking(driver)
+    # Enable request interception
+    enable_request_interception(driver)
 
     return driver
 
