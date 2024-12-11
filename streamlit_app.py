@@ -12,10 +12,10 @@ def scrape_dexscreener_with_proxy():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
     }
 
-    # Use a proxy service
+    # Proxy details
     proxies = {
-        "http": "http://your-proxy-url:port",  # Replace with your HTTP proxy
-        "https": "http://your-proxy-url:port",  # Replace with your HTTPS proxy
+        "http": "http://160.223.163.31:8080",
+        "https": "http://160.223.163.31:8080",
     }
 
     try:
@@ -63,10 +63,10 @@ def scrape_gmgn_with_proxy():
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
     }
 
-    # Use a proxy service
+    # Proxy details
     proxies = {
-        "http": "http://your-proxy-url:port",  # Replace with your HTTP proxy
-        "https": "http://your-proxy-url:port",  # Replace with your HTTPS proxy
+        "http": "http://160.223.163.31:8080",
+        "https": "http://160.223.163.31:8080",
     }
 
     try:
