@@ -23,8 +23,13 @@ def get_driver():
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
     )
 
-    # Optional: Add proxy settings if needed
-    # options.add_argument("--proxy-server=http://your_proxy_ip:port")
+    # Block unnecessary scripts and ads
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument("--disable-blink-features=Ads")
+    options.add_argument("--disable-blink-features=PreloadScripts")
+
+    # Block specific third-party domains (e.g., cdn.segment.com)
+    options.add_argument("host-resolver-rules=MAP cdn.segment.com 0.0.0.0")
 
     service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
 
