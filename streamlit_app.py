@@ -4,7 +4,7 @@ from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
 # Load the Salesforce CodeT5 model and tokenizer
 @st.cache_resource
 def load_model():
-    model_name = "Salesforce/codeT5-base"
+    model_name = "Ilya"
     tokenizer = AutoTokenizer.from_pretrained(model_name)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
     return tokenizer, model
@@ -17,7 +17,7 @@ except Exception as e:
     st.stop()
 
 # Streamlit app title
-st.title("Salesforce CodeT5 - AI Coding Assistant 🤖")
+st.title("Ilya- Your AI Coding Assistant 🤖")
 
 # Input box for user prompt
 prompt = st.text_area("Enter your coding task or question:", "")
