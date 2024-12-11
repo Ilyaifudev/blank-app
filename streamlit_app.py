@@ -4,7 +4,6 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.webdriver import WebDriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
 from bs4 import BeautifulSoup
 import requests
 
@@ -41,11 +40,7 @@ def get_driver():
 
     service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
 
-    # Enable logging for CDP commands
-    caps = DesiredCapabilities.CHROME
-    caps["goog:loggingPrefs"] = {"performance": "ALL"}
-
-    driver = webdriver.Chrome(service=service, options=options, desired_capabilities=caps)
+    driver = webdriver.Chrome(service=service, options=options)
 
     # Block requests to specific third-party domains
     enable_request_blocking(driver)
@@ -96,9 +91,48 @@ def scrape_dexscreener_trending():
         driver.quit()
 
 
+def scrape_gmgn_trending():
+    """
+    Scrapes GMGN's website for trending tokens.
+    """
+    url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
+    headers = {"User-Agent": "Mozilla/5.0"}
+
+    try:
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+
+        soup = BeautifulSoup(response.text, 'html.parser')
+        tokens = []
+
+        # Replace selectors with actual ones from GMGN's page structure
+        for item in soup.select(".token-item"):  # Update this selector
+            name = item.select_one(".token-name").get_text(strip=True)
+            contract = item.select_one(".token-contract").get_text(strip=True)
+            liquidity = item.select_one(".token-liquidity").get_text(strip=True)
+            volume = item.select_one(".token-volume").get_text(strip=True)
+            age = item.select_one(".token-age").get_text(strip=True)
+            holders = item.select_one(".token-holders").get_text(strip=True)
+
+            tokens.append({
+                "name": name,
+                "contract": contract,
+                "liquidity": float(liquidity.replace("$", "").replace(",", "")),
+                "volume": float(volume.replace("$", "").replace(",", "")),
+                "age": float(age.replace(" hours", "")),
+                "holders": int(holders.replace(",", ""))
+            })
+
+        return tokens
+    except Exception as e:
+        st.error(f"Error scraping GMGN: {e}")
+        return []
+
+
 # Streamlit App
 st.title("Trending Token Scraper")
 
+# Scrape Dexscreener Data
 st.header("Dexscreener Trending Tokens")
 if st.button("Scrape Dexscreener"):
     dexscreener_tokens = scrape_dexscreener_trending()
@@ -108,3 +142,14 @@ if st.button("Scrape Dexscreener"):
             st.write(token)
     else:
         st.warning("No tokens found or failed to scrape Dexscreener.")
+
+# Scrape GMGN Data
+st.header("GMGN Trending Tokens")
+if st.button("Scrape GMGN"):
+    gmgn_tokens = scrape_gmgn_trending()
+    if gmgn_tokens:
+        st.write(f"Found {len(gmgn_tokens)} tokens on GMGN.")
+        for token in gmgn_tokens:
+            st.write(token)
+    else:
+        st.warning("No tokens found or failed to scrape GMGN.")
