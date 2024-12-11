@@ -14,6 +14,19 @@ def fetch_token_data(token_address):
         st.error(f"Error fetching Dexscreener data: {e}")
         return None
 
+# Fetch data from GMGN
+def fetch_gmgn_data():
+    """Scrapes GMGN data for trending tokens."""
+    try:
+        url = "https://gmgn.com/api/trending"  # Replace with the actual GMGN API endpoint
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Error fetching GMGN data: {e}")
+        return []
+
 # Filter tokens based on criteria
 def filter_tokens(token_data):
     """Filters tokens based on specified criteria."""
@@ -85,6 +98,17 @@ if st.button("Check Token"):
             st.error("Failed to fetch token data.")
     else:
         st.error("Please enter a valid token contract address.")
+
+# GMGN Integration
+st.subheader("Fetch Trending Tokens from GMGN")
+if st.button("Fetch GMGN Trending Tokens"):
+    gmgn_data = fetch_gmgn_data()
+    if gmgn_data:
+        st.write(f"Found {len(gmgn_data)} trending tokens on GMGN.")
+        for token in gmgn_data:
+            st.write(f"Token: {token.get('name', 'Unknown')} - Contract: {token.get('contract', 'N/A')}")
+    else:
+        st.warning("No trending tokens found on GMGN.")
 
 # Manual RugCheck
 st.subheader("Manual RugCheck")
