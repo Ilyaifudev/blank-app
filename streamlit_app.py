@@ -1,48 +1,92 @@
 import streamlit as st
-from transformers import AutoTokenizer, AutoModelForSeq2SeqLM
+import requests
+from bs4 import BeautifulSoup
+import datetime
 
-# Load the Salesforce CodeT5 model and tokenizer
-@st.cache_resource
-def load_model():
-    model_name = "Ilya"
-    tokenizer = AutoTokenizer.from_pretrained(model_name)
-    model = AutoModelForSeq2SeqLM.from_pretrained(model_name)
-    return tokenizer, model
+# Helper Functions
+def fetch_gmgn_data():
+    """Scrapes GMGN data for trending tokens."""
+    try:
+        url = "https://gmgn.com/api/trending"  # Replace with actual API or endpoint
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Error fetching GMGN data: {e}")
+        return []
 
-# Load the model and tokenizer
-try:
-    tokenizer, model = load_model()
-except Exception as e:
-    st.error(f"Error loading the model: {e}")
-    st.stop()
+def fetch_dexscreener_data():
+    """Scrapes Dexscreener data for high-volume tokens."""
+    try:
+        url = "https://dexscreener.com/api/trending"  # Replace with actual API or endpoint
+        response = requests.get(url)
+        response.raise_for_status()
+        return response.json()
+    except Exception as e:
+        st.error(f"Error fetching Dexscreener data: {e}")
+        return []
 
-# Streamlit app title
-st.title("Ilya- Your AI Coding Assistant 🤖")
+def filter_tokens(tokens):
+    """Filters tokens based on liquidity, volume, age, and holders."""
+    filtered = []
+    for token in tokens:
+        try:
+            liquidity = token.get("liquidity", 0)
+            volume = token.get("volume", 0)
+            age = token.get("age", 0)  # Assume age is in hours
+            holders = token.get("holders", 0)
 
-# Input box for user prompt
-prompt = st.text_area("Enter your coding task or question:", "")
+            if liquidity < 100000 and volume < 250000 and age >= 24 and holders <= 300:
+                filtered.append(token)
+        except Exception as e:
+            st.warning(f"Error filtering token: {e}")
+    return filtered
 
-# Generate code when the user clicks the button
-if st.button("Generate Code"):
-    if prompt.strip():
-        with st.spinner("Generating code..."):
-            try:
-                # Tokenize input and generate output
-                inputs = tokenizer(prompt, return_tensors="pt")
-                outputs = model.generate(inputs["input_ids"], max_length=256)
-                generated_code = tokenizer.decode(outputs[0], skip_special_tokens=True)
+def check_rug_safety(contract_address):
+    """Runs the contract address through RugCheck and retrieves the safety report."""
+    try:
+        url = f"https://rugcheck.xyz/api/check/{contract_address}"
+        response = requests.get(url)
+        response.raise_for_status()
+        data = response.json()
+        if data.get("minimum_score") in ["Good", "Excellent"]:  # Adjust as per API
+            return data
+        return None
+    except Exception as e:
+        st.error(f"Error checking RugCheck for {contract_address}: {e}")
+        return None
 
-                # Display the generated code
-                st.subheader("Generated Code")
-                st.code(generated_code, language="python")
-            except Exception as e:
-                st.error(f"Error generating code: {e}")
-    else:
-        st.warning("Please enter a prompt to generate code.")
+# Streamlit App
+st.title("Token Screener & Rug Safety Checker")
 
-# Instructions for using the app
-st.markdown("""
-### How to Use
-1. Enter a natural language description of your coding task or question (e.g., "Write a Python function to reverse a string").
-2. Click "Generate Code" to see the AI-generated code.
-""")
+# Button to fetch tokens
+if st.button("Fetch Trending Tokens"):
+    st.write("Fetching data from GMGN and Dexscreener...")
+    gmgn_tokens = fetch_gmgn_data()
+    dexscreener_tokens = fetch_dexscreener_data()
+
+    # Combine tokens from both sources
+    all_tokens = gmgn_tokens + dexscreener_tokens
+    filtered_tokens = filter_tokens(all_tokens)
+
+    st.write(f"Found {len(filtered_tokens)} tokens meeting criteria.")
+    for token in filtered_tokens:
+        st.write(f"Checking safety for token: {token['name']} ({token['contract']})")
+        safety_report = check_rug_safety(token["contract"])
+        if safety_report:
+            st.success(
+                f"Token: {token['name']} ({token['contract']}) - Safety Score: {safety_report['minimum_score']}"
+            )
+        else:
+            st.warning(f"Token {token['name']} did not pass RugCheck criteria.")
+
+# Manual Check
+st.subheader("Manual RugCheck")
+manual_contract = st.text_input("Enter a contract address:")
+if st.button("Run Manual RugCheck"):
+    if manual_contract.strip():
+        safety_report = check_rug_safety(manual_contract.strip())
+        if safety_report:
+            st.success(
+                f"Contract Address: {manual_contract} - Safety Score: {safety_report['minimum_score']}"
+            )
