@@ -2,34 +2,40 @@ import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
 from bs4 import BeautifulSoup
 import requests
 
 
-# Function to scrape Dexscreener using Selenium
-def scrape_dexscreener_trending():
+def get_driver():
     """
-    Scrapes Dexscreener's trending tokens using Selenium with WebDriver Manager.
+    Set up Selenium WebDriver with Chromium and Chromedriver.
     """
-    url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
-
-    # Selenium options for headless mode
     options = Options()
     options.add_argument("--headless")
     options.add_argument("--disable-gpu")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.binary_location = "/usr/bin/chromium"  # Path to Chromium binary
 
-    # Use WebDriver Manager to install and manage Chromedriver automatically
-    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+    service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
 
+    driver = webdriver.Chrome(service=service, options=options)
+    return driver
+
+
+def scrape_dexscreener_trending():
+    """
+    Scrapes Dexscreener's trending tokens using Selenium.
+    """
+    url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
+
+    driver = get_driver()
     tokens = []
 
     try:
         driver.get(url)
 
-        # Locate rows in the trending table (Update selectors based on actual structure)
+        # Locate rows in the trending table (Adjust selectors based on actual structure)
         rows = driver.find_elements(By.CSS_SELECTOR, "tr")
         for row in rows:
             columns = row.find_elements(By.CSS_SELECTOR, "td")
@@ -60,7 +66,6 @@ def scrape_dexscreener_trending():
         driver.quit()
 
 
-# Function to scrape GMGN using BeautifulSoup
 def scrape_gmgn_trending():
     """
     Scrapes GMGN's website for trending tokens.
