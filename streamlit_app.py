@@ -1,5 +1,9 @@
 import streamlit as st
-from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import AutoTokenizer, AutoModelForCausalLM
+import os
+
+# Set a custom cache directory
+os.environ["TRANSFORMERS_CACHE"] = "./model_cache"
 
 # Hugging Face API token
 HF_TOKEN = "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"
@@ -13,7 +17,11 @@ def load_model():
     return tokenizer, model
 
 # Load the model and tokenizer
-tokenizer, model = load_model()
+try:
+    tokenizer, model = load_model()
+except Exception as e:
+    st.error(f"Error loading the model: {e}")
+    st.stop()
 
 # Streamlit app title
 st.title("BigCode StarCoder - AI Coding Assistant 🤖")
@@ -38,10 +46,3 @@ if st.button("Generate Code"):
                 st.error(f"Error generating code: {e}")
     else:
         st.warning("Please enter a prompt to generate code.")
-
-# Instructions for using the app
-st.markdown("""
-### How to Use
-1. Enter a natural language description of your coding task or question (e.g., "Write a Python function to reverse a string").
-2. Click "Generate Code" to see the AI-generated code.
-""")
