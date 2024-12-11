@@ -2,7 +2,7 @@ import streamlit as st
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By  # Import By for locating elements
+from selenium.webdriver.common.by import By  # Import for locating elements
 from bs4 import BeautifulSoup
 import requests
 
@@ -17,6 +17,14 @@ def get_driver():
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.binary_location = "/usr/bin/chromium"  # Path to Chromium binary
+
+    # Set a legitimate User-Agent
+    options.add_argument(
+        "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
+    )
+
+    # Optional: Add proxy settings if needed
+    # options.add_argument("--proxy-server=http://your_proxy_ip:port")
 
     service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
 
