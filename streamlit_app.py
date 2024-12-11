@@ -8,15 +8,14 @@ from bs4 import BeautifulSoup
 import requests
 
 
-def enable_request_interception(driver: WebDriver):
+def enable_request_blocking(driver: WebDriver):
     """
-    Enable interception and blocking of requests to specific URLs.
+    Enable blocking of network requests to specific URLs using Chrome DevTools Protocol (CDP).
     """
-    # Block requests to third-party domains
-    driver.execute_cdp_cmd("Network.setRequestInterception", {
-        "patterns": [{"urlPattern": "https://cdn.segment.com/*"}]
-    })
     driver.execute_cdp_cmd("Network.enable", {})
+    driver.execute_cdp_cmd("Network.setBlockedURLs", {
+        "urls": ["https://cdn.segment.com/*"]  # Block requests to this domain
+    })
 
 
 def get_driver():
@@ -35,16 +34,11 @@ def get_driver():
         "user-agent=Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36"
     )
 
-    # Block unnecessary scripts and ads
-    options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument("--disable-blink-features=Ads")
-
     service = Service("/usr/bin/chromedriver")  # Path to Chromedriver binary
-
     driver = webdriver.Chrome(service=service, options=options)
 
-    # Enable request interception
-    enable_request_interception(driver)
+    # Enable request blocking
+    enable_request_blocking(driver)
 
     return driver
 
