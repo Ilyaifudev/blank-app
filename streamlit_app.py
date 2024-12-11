@@ -5,7 +5,7 @@ import requests
 
 def scrape_dexscreener_with_proxy():
     """
-    Scrapes Dexscreener's trending tokens using a proxy.
+    Scrapes Dexscreener's trending tokens using a proxy and ignores SSL verification.
     """
     url = "https://dexscreener.com/solana?rankBy=trendingScoreH1&order=desc"
     headers = {
@@ -19,7 +19,7 @@ def scrape_dexscreener_with_proxy():
     }
 
     try:
-        response = requests.get(url, headers=headers, proxies=proxies)
+        response = requests.get(url, headers=headers, proxies=proxies, verify=False)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
@@ -56,7 +56,7 @@ def scrape_dexscreener_with_proxy():
 
 def scrape_gmgn_with_proxy():
     """
-    Scrapes GMGN's trending tokens using a proxy.
+    Scrapes GMGN's trending tokens using a proxy and ignores SSL verification.
     """
     url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
     headers = {
@@ -70,7 +70,7 @@ def scrape_gmgn_with_proxy():
     }
 
     try:
-        response = requests.get(url, headers=headers, proxies=proxies)
+        response = requests.get(url, headers=headers, proxies=proxies, verify=False)
         response.raise_for_status()
 
         soup = BeautifulSoup(response.text, "html.parser")
