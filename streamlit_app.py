@@ -1,63 +1,42 @@
-def scrape_gmgn_with_proxy():
-    """
-    Scrapes GMGN's trending tokens using a proxy with enhanced headers and retry mechanism.
-    """
-    import random
-    from tenacity import retry, stop_after_attempt, wait_fixed
+import streamlit as st
 
-    url = "https://gmgn.ai/?chain=sol&ref=LbosYDck"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/96.0.4664.45 Safari/537.36",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
-        "Accept-Language": "en-US,en;q=0.5",
-        "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
-        "Upgrade-Insecure-Requests": "1",
-        "DNT": "1",
-    }
+# Predefined solutions for common issues
+TROUBLESHOOTING_GUIDE = {
+    "slow computer": "Your computer might be slow due to background apps or insufficient resources. Try restarting your computer, closing unused programs, or upgrading RAM if possible.",
+    "internet not working": "Check if your router is powered on. Restart the router, check for loose cables, and verify your Wi-Fi or Ethernet connection.",
+    "software not installing": "Ensure you have enough disk space and administrator privileges. Check if the software is compatible with your OS version.",
+    "blue screen of death": "This could be due to hardware issues or corrupted drivers. Try booting into safe mode and updating your drivers or running diagnostics.",
+    "printer not working": "Ensure the printer is powered on and connected. Check if drivers are installed correctly and restart the printer and your computer.",
+    "overheating": "Make sure your computer's fans are working and not clogged with dust. Place the computer in a well-ventilated area and consider using a cooling pad.",
+    "keyboard not responding": "Check the connection (wired or wireless). Try plugging it into another port or restarting the computer.",
+    "unable to boot": "Check if the power supply is working. Disconnect external devices and boot into safe mode to diagnose further.",
+    "sound not working": "Check if the speakers are connected and powered. Verify the audio output settings on your computer.",
+    "file not opening": "Ensure the file format is supported by the application you're using. If the file is corrupted, try using a repair tool.",
+}
 
-    # Rotate proxies
-    proxies_list = [
-        "http://160.223.163.31:8080",
-        "http://165.227.44.38:3128",
-    ]
-    proxies = {
-        "http": random.choice(proxies_list),
-        "https": random.choice(proxies_list),
-    }
+# Streamlit App
+st.title("TekSupport 9000")
+st.write("Hello! I'm your helpdesk. I can help troubleshoot common computer issues. How can I assist you today?")
 
-    @retry(stop=stop_after_attempt(3), wait=wait_fixed(2))
-    def fetch_data():
-        response = requests.get(url, headers=headers, proxies=proxies, verify=False)
-        response.raise_for_status()
-        return response
+# User Input
+user_query = st.text_input("Describe your issue:", "")
 
-    try:
-        response = fetch_data()
+# Process the user query
+if user_query:
+    user_query_lower = user_query.lower()
+    response_found = False
 
-        soup = BeautifulSoup(response.text, "html.parser")
-        tokens = []
+    for issue, solution in TROUBLESHOOTING_GUIDE.items():
+        if issue in user_query_lower:
+            st.write(f"**Issue:** {issue.capitalize()}")
+            st.write(f"**Solution:** {solution}")
+            response_found = True
+            break
 
-        # Update selectors to match GMGN's HTML structure
-        rows = soup.select(".token-item")  # Update based on actual HTML
-        for row in rows:
-            name = row.select_one(".token-name").text.strip() if row.select_one(".token-name") else "N/A"
-            contract = row.select_one(".token-contract").text.strip() if row.select_one(".token-contract") else "N/A"
-            liquidity = row.select_one(".token-liquidity").text.strip().replace("$", "").replace(",", "") if row.select_one(".token-liquidity") else "0"
-            volume = row.select_one(".token-volume").text.strip().replace("$", "").replace(",", "") if row.select_one(".token-volume") else "0"
-            age = row.select_one(".token-age").text.strip().replace(" hours", "") if row.select_one(".token-age") else "0"
-            holders = row.select_one(".token-holders").text.strip().replace(",", "") if row.select_one(".token-holders") else "0"
+    if not response_found:
+        st.write("I'm sorry, I don't have a solution for that issue. Please provide more details or contact IT support.")
 
-            tokens.append({
-                "name": name,
-                "contract": contract,
-                "liquidity": float(liquidity),
-                "volume": float(volume),
-                "age": float(age),
-                "holders": int(holders),
-            })
-
-        return tokens
-    except requests.exceptions.RequestException as e:
-        st.error(f"Error scraping GMGN with Proxy: {e}")
-        return []
+# Example Quick Queries
+st.write("#### Common Issues You Can Ask About:")
+for issue in TROUBLESHOOTING_GUIDE.keys():
+    st.write(f"- {issue.capitalize()}")
